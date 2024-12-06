@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Manager</title>
+    <style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+.container {
+    width: 80%;
+    margin: 20px auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2 {
+    text-align: center;
+    color: #333;
+}
+
+.search-bar {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.search-bar input {
+    width: 50%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+table th, table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: left;
+}
+
+form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+form input, form textarea, form button {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+form textarea {
+    width: 100%;
+    height: 100px;
+}
+
+form button {
+    background: #007BFF;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+form button:hover {
+    background: #0056b3;
+}
+
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Project Manager</h1>
+
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Search by any field...">
+        </div>
+
+        <table id="projectTable">
+            <thead>
+                <tr>
+                    <th>Company Name</th>
+                    <th>Customer Name</th>
+                    <th>PO Number</th>
+                    <th>Start Date</th>
+                    <th>Due Date</th>
+                    <th>Details</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <h2>Add / Edit Project</h2>
+        <form id="projectForm">
+            <input type="hidden" id="projectId">
+            <input type="text" id="companyName" placeholder="Company Name" required>
+            <input type="text" id="customerName" placeholder="Customer Name" required>
+            <input type="text" id="poNumber" placeholder="PO Number" required>
+            <input type="date" id="startDate" required>
+            <input type="date" id="dueDate" required>
+            <textarea id="details" placeholder="Details" required></textarea>
+            <button type="submit">Save</button>
+        </form>
+    </div>
+
+    <!-- Firebase Integration -->
+    <script type="module">
+        // Import Firebase and required SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAYlVNQiGhR59v3YilgzGMYHsSYWrK-gn8",
+            authDomain: "amtool-b4bb3.firebaseapp.com",
+            projectId: "amtool-b4bb3",
+            storageBucket: "amtool-b4bb3.firebasestorage.app",
+            messagingSenderId: "388335177291",
+            appId: "1:388335177291:web:26648ab80d8e876a9547ce"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const projectsRef = ref(db, "projects");
+
+        // DOM Elements
+        const projectForm = document.getElementById("projectForm");
+        const projectTable = document.getElementById("projectTable").querySelector("tbody");
+        const searchInput = document.getElementById("searchInput");
+
+        function renderProjects(snapshot) {
+    projectTable.innerHTML = ""; // Clear existing rows
+    snapshot.forEach(projectSnapshot => {
+        const project = projectSnapshot.val();
+        const projectId = projectSnapshot.key;
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${project.companyName}</td>
+            <td>${project.customerName}</td>
+            <td>${project.poNumber}</td>
+            <td>${project.startDate}</td>
+            <td>${project.dueDate}</td>
+            <td>${project.details}</td>
+            <td></td> <!-- Placeholder for buttons -->
+        `;
+
+        // Create Edit button
+        const editButton = document.createElement("button");
+        editButton.textContent = "Edit";
+        editButton.onclick = () => editProject(projectId, project); // Attach handler dynamically
+
+        // Create Delete button
+        const deleteButton = document.createElement("button");
+        deleteButton.textContent = "Delete";
+        deleteButton.onclick = () => deleteProject(projectId); // Attach handler dynamically
+
+        // Append buttons to the last cell
+        const actionCell = row.querySelector("td:last-child");
+        actionCell.appendChild(editButton);
+        actionCell.appendChild(deleteButton);
+
+        // Append row to the table
+        projectTable.appendChild(row);
+    });
+}
+
+
+        // Add or update project in the database
+        function addOrEditProject(event) {
+            event.preventDefault();
+
+            const id = projectForm.projectId.value;
+            const project = {
+                companyName: projectForm.companyName.value,
+                customerName: projectForm.customerName.value,
+                poNumber: projectForm.poNumber.value,
+                startDate: projectForm.startDate.value,
+                dueDate: projectForm.dueDate.value,
+                details: projectForm.details.value
+            };
+
+            if (id) {
+                update(ref(db, `projects/${id}`), project);
+            } else {
+                push(projectsRef, project);
+            }
+
+            projectForm.reset(); // Clear the form
+        }
+
+        // Delete a project
+        function deleteProject(id) {
+            remove(ref(db, `projects/${id}`));
+        }
+
+        // Edit a project (populate form)
+        window.editProject = (id, project) => {
+            projectForm.projectId.value = id;
+            projectForm.companyName.value = project.companyName;
+            projectForm.customerName.value = project.customerName;
+            projectForm.poNumber.value = project.poNumber;
+            projectForm.startDate.value = project.startDate;
+            projectForm.dueDate.value = project.dueDate;
+            projectForm.details.value = project.details;
+        };
+
+        // Search functionality
+        function searchProjects() {
+            const query = searchInput.value.toLowerCase();
+            onValue(projectsRef, snapshot => {
+                projectTable.innerHTML = "";
+                snapshot.forEach(projectSnapshot => {
+                    const project = projectSnapshot.val();
+                    const projectId = projectSnapshot.key;
+
+                    if (Object.values(project).some(value => value.toString().toLowerCase().includes(query))) {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `
+                            <td>${project.companyName}</td>
+                            <td>${project.customerName}</td>
+                            <td>${project.poNumber}</td>
+                            <td>${project.startDate}</td>
+                            <td>${project.dueDate}</td>
+                            <td>${project.details}</td>
+                            <td>
+                                <button onclick="editProject('${projectId}', ${JSON.stringify(project)})">Edit</button>
+                                <button onclick="deleteProject('${projectId}')">Delete</button>
+                            </td>
+                        `;
+                        projectTable.appendChild(row);
+                    }
+                });
+            });
+        }
+
+        // Attach event listeners
+        projectForm.addEventListener("submit", addOrEditProject);
+        searchInput.addEventListener("input", searchProjects);
+
+        // Listen for database updates
+        onValue(projectsRef, renderProjects);
+	window.deleteProject = function(id) {
+    remove(ref(db, `projects/${id}`));
+};
+// Attach the editProject function to the global window object
+window.editProject = function(id, project) {
+    projectForm.projectId.value = id;
+    projectForm.companyName.value = project.companyName;
+    projectForm.customerName.value = project.customerName;
+    projectForm.poNumber.value = project.poNumber;
+    projectForm.startDate.value = project.startDate;
+    projectForm.dueDate.value = project.dueDate;
+    projectForm.details.value = project.details;
+};
+    </script>
+</body>
+</html>
